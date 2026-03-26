@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Field Data - Agregar Permiso</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #075e54; color: white; text-align: center; }
+        .box { background: white; color: #333; padding: 30px; border-radius: 15px; max-width: 500px; margin: 20px auto; }
+        h2 { color: #075e54; }
+        input { padding: 15px; font-size: 18px; width: 80%; border-radius: 10px; border: 2px solid #ddd; text-align: center; }
+        button { background: #075e54; color: white; padding: 15px 30px; font-size: 18px; border-radius: 10px; border: none; cursor: pointer; margin: 10px; }
+        .note { background: #fff3cd; padding: 15px; border-radius: 10px; margin: 20px 0; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <h1>🌾 Field Data</h1>
+    
+    <div class="box">
+        <h2>Permiso de Micrófono</h2>
+        
+        <p>Escribí la URL de tu sitio:</p>
+        <input type="text" id="siteUrl" value="http://localhost:8000" readonly>
+        <br><br>
+        <button onclick="askPermission()">🔓 Pedir Permiso</button>
+        
+        <div class="note">
+            <strong>Si no funciona:</strong><br>
+            1. Copiá esta URL: <code>chrome://settings/content</code><br>
+            2. Buscá "Micrófono"<br>
+            3. Agregá: <code>localhost</code> → Permitir
+        </div>
+        
+        <button onclick="window.location='index.html'">← Chat</button>
+    </div>
+
+    <script>
+        async function askPermission() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(t => t.stop());
+                alert('✅ ¡Permiso concedido!');
+                window.location = 'index.html';
+            } catch(e) {
+                alert('❌ Denegado.\n\nEl navegador requiere que agregues el permiso manualmente en la configuración.');
+            }
+        }
+    </script>
+</body>
+</html>

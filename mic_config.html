@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field Data - Configuración de Micrófono</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: #fff;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { color: #075e54; margin-bottom: 20px; }
+        h2 { color: #dc3545; margin-bottom: 20px; font-size: 24px; }
+        p { color: #666; margin-bottom: 20px; line-height: 1.6; }
+        .step {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: left;
+        }
+        .step-number {
+            display: inline-block;
+            background: #075e54;
+            color: #fff;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        .btn {
+            display: inline-block;
+            background: #075e54;
+            color: #fff;
+            padding: 15px 30px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 5px;
+            cursor: pointer;
+        }
+        .btn:hover { background: #054c44; }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .btn-secondary:hover { background: #5a6268; }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Configurar Micrófono</h1>
+        <h2>El micrófono está bloqueado</h2>
+        
+        <p>Para usar el voz en Field Data, habilitá el micrófono:</p>
+        
+        <div class="step">
+            <span class="step-number">1</span>
+            <strong>Copiá este enlace:</strong><br>
+            <code style="background: #eee; padding: 5px 10px; border-radius: 5px; word-break: break-all;">chrome://settings/content/microphone</code>
+        </div>
+        
+        <div class="step">
+            <span class="step-number">2</span>
+            <strong>Pegalo en la barra de Chrome y apreta Enter</strong>
+        </div>
+        
+        <div class="step">
+            <span class="step-number">3</span>
+            <strong>Buscá "localhost" y permití el micrófono</strong>
+        </div>
+        
+        <a href="chrome://settings/content/microphone" class="btn" target="_blank">
+            🔗 Ir a Configuración de Micrófono
+        </a>
+        
+        <br><br>
+        <a href="index.html" class="btn btn-secondary">
+            ← Volver al Chat
+        </a>
+        
+        <p style="margin-top: 30px; font-size: 12px;">
+            Después de habilitar, volvé a esta página y clickeá "Probar Micrófono"
+        </p>
+        
+        <button onclick="testMic()" class="btn" style="margin-top: 20px;">
+            🎤 Probar Micrófono
+        </button>
+    </div>
+
+    <script>
+        async function testMic() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop());
+                alert('✅ ¡Micrófono habilitado! Ahora podés usar el chat.');
+                window.location.href = 'index.html';
+            } catch(err) {
+                alert('❌ Micrófono sigue bloqueado.\n\nSeguí los pasos de configuración.');
+            }
+        }
+    </script>
+</body>
+</html>

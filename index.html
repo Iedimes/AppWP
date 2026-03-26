@@ -8,92 +8,143 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #e5ddd5; height: 100vh; display: flex; justify-content: center; align-items: center; }
         .chat-container { width: 100%; max-width: 500px; height: 90vh; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
-        .chat-header { background: #075e54; color: #fff; padding: 15px; display: flex; align-items: center; gap: 10px; }
-        .chat-header img { width: 40px; height: 40px; border-radius: 50%; background: #fff; }
-        .chat-header h2 { font-size: 16px; }
-        .chat-header span { font-size: 12px; opacity: 0.8; }
+        .chat-header { background: #075e54; color: #fff; padding: 15px; display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+        .chat-header-left { display: flex; align-items: center; gap: 10px; }
+        .user-info { font-size: 12px; text-align: right; }
+        .user-info strong { display: block; font-size: 14px; }
+        .logout-btn { background: #dc3545; color: #fff; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 11px; }
         .chat-messages { flex: 1; padding: 20px; overflow-y: auto; background: #e5ddd5; }
         .message { max-width: 80%; margin-bottom: 15px; padding: 10px 15px; border-radius: 10px; font-size: 14px; line-height: 1.4; }
         .message.user { background: #dcf8c6; margin-left: auto; border-bottom-right-radius: 0; }
         .message.bot { background: #fff; border-bottom-left-radius: 0; }
-        .chat-input { padding: 15px; background: #f0f0f0; display: flex; gap: 10px; }
+        .chat-input { padding: 15px; background: #f0f0f0; display: flex; gap: 10px; align-items: center; }
         .chat-input input { flex: 1; padding: 12px; border: none; border-radius: 25px; outline: none; font-size: 14px; }
         .chat-input button { background: #075e54; color: #fff; border: none; padding: 12px 20px; border-radius: 25px; cursor: pointer; font-weight: bold; }
         .chat-input button:hover { background: #054c44; }
-        .data-preview { background: #f8f9fa; padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 12px; }
-        .data-preview strong { color: #075e54; }
+        .mic-btn { width: 45px; height: 45px; border-radius: 50%; background: #28a745; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .mic-btn.recording { background: #dc3545; animation: pulse 1s infinite; }
+        .mic-btn.blocked { background: #6c757d; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        
+        .login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #075e54; display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .login-box { background: #fff; padding: 30px; border-radius: 20px; text-align: center; max-width: 350px; width: 90%; }
+        .login-box h2 { color: #075e54; margin-bottom: 20px; }
+        .login-box input { width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; margin-bottom: 15px; text-align: center; }
+        .login-box button { width: 100%; padding: 15px; background: #075e54; color: #fff; border: none; border-radius: 10px; font-size: 16px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div class="chat-container">
+    <div id="loginScreen" class="login-screen">
+        <div class="login-box">
+            <h2>🌾 Field Data</h2>
+            <input type="tel" id="loginPhone" placeholder="Tu número de teléfono">
+            <button onclick="login()">Entrar</button>
+        </div>
+    </div>
+
+    <div class="chat-container" id="chatContainer" style="display: none;">
         <div class="chat-header">
-            <div style="width: 40px; height: 40px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px;">🌾</div>
-            <div>
-                <h2>Field Data</h2>
-                <span>Gestión Agropecuaria</span>
+            <div class="chat-header-left">
+                <div style="width: 40px; height: 40px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px;">🌾</div>
+                <div><h2>Field Data</h2><span>Gestión Agropecuaria</span></div>
+            </div>
+            <div class="user-info">
+                <strong id="userDisplay"></strong>
+                <button class="logout-btn" onclick="logout()">Salir</button>
             </div>
         </div>
         <div class="chat-messages" id="messages">
-            <div class="message bot">
-                ¡Hola! Soy Field Data, tu asistente de gestión agropecuaria.
-                <br><br>
-                Puedo ayudarte a registrar:
-                <br>• Siembra de cultivos
-                <br>• Nacimiento de animales
-                <br>• Compras y gastos
-                <br>• Stock y inventario
-                <br><br>
-                También podés preguntarme sobre tus registros.
-                <br><br>
-                <em>Ejemplo: "Sembramos maíz en lote Norte" o "¿cuánto gasté?"</em>
-            </div>
+            <div class="message bot">¡Hola! Escribí o usá el 🎤 para registrar.</div>
         </div>
         <div class="chat-input">
-            <input type="text" id="userInput" placeholder="Escribí un mensaje..." onkeypress="handleKeyPress(event)">
+            <button class="mic-btn" id="micBtn" onclick="toggleVoice()">🎤</button>
+            <input type="text" id="userInput" placeholder="Escribí..." onkeypress="if(event.key==='Enter')sendMessage()">
             <button onclick="sendMessage()">Enviar</button>
         </div>
     </div>
 
     <script>
-        function handleKeyPress(e) {
-            if (e.key === 'Enter') sendMessage();
+        let userPhone = localStorage.getItem('fd_phone') || '';
+        let isRecording = false;
+        let recognition = null;
+
+        if (userPhone) showChat();
+
+        function login() {
+            const p = document.getElementById('loginPhone').value.trim();
+            if (!p) return alert('Ingresá tu número');
+            userPhone = p;
+            localStorage.setItem('fd_phone', p);
+            showChat();
+            initMic();
+        }
+
+        function logout() { localStorage.removeItem('fd_phone'); location.reload(); }
+
+        function showChat() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('chatContainer').style.display = 'flex';
+            document.getElementById('userDisplay').textContent = userPhone;
+        }
+
+        async function initMic() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(t => t.stop());
+                document.getElementById('micBtn').classList.remove('blocked');
+            } catch(e) {
+                document.getElementById('micBtn').classList.add('blocked');
+            }
+        }
+
+        if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SR();
+            recognition.lang = 'es-AR';
+            recognition.onstart = () => {
+                isRecording = true;
+                document.getElementById('micBtn').classList.add('recording');
+            };
+            recognition.onend = () => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+            };
+            recognition.onresult = (e) => {
+                if (e.results[0].isFinal) {
+                    document.getElementById('userInput').value = e.results[0][0].transcript;
+                    sendMessage();
+                }
+            };
+            recognition.onerror = (e) => {
+                isRecording = false;
+                document.getElementById('micBtn').classList.remove('recording');
+            };
+        }
+
+        function toggleVoice() {
+            if (!recognition) return alert('Voz no disponible');
+            if (isRecording) recognition.stop();
+            else recognition.start();
         }
 
         function sendMessage() {
-            const input = document.getElementById('userInput');
-            const message = input.value.trim();
-            if (!message) return;
-
-            addMessage(message, 'user');
-            input.value = '';
-
-            setTimeout(() => {
-                processMessage(message);
-            }, 500);
-        }
-
-        function addMessage(text, sender) {
-            const container = document.getElementById('messages');
-            const div = document.createElement('div');
-            div.className = `message ${sender}`;
-            div.innerHTML = text;
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
-        }
-
-        function processMessage(message) {
+            const m = document.getElementById('userInput').value.trim();
+            if (!m) return;
+            add(m, 'user');
+            document.getElementById('userInput').value = '';
             fetch('process.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: message })
-            })
-            .then(res => res.json())
-            .then(data => {
-                addMessage(data.response, 'bot');
-            })
-            .catch(err => {
-                addMessage('Error al procesar. Probá de nuevo.', 'bot');
-            });
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: m, user: userPhone})
+            }).then(r => r.json()).then(d => add(d.response, 'bot')).catch(() => add('Error', 'bot'));
+        }
+
+        function add(t, s) {
+            const d = document.createElement('div');
+            d.className = 'message ' + s;
+            d.innerHTML = t;
+            document.getElementById('messages').appendChild(d);
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
         }
     </script>
 </body>

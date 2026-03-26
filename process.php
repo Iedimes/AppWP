@@ -14,6 +14,7 @@ $dbname = $config['db_name'] ?? 'field_data';
 
 $input = json_decode(file_get_contents('php://input'), true);
 $message = trim($input['message'] ?? '');
+$user = trim($input['user'] ?? 'anonimo');
 
 $db = new mysqli($dbhost, $dbuser, $dbpass, $dbname);
 
@@ -32,6 +33,7 @@ $db->query("CREATE TABLE IF NOT EXISTS registros (
     cultivo VARCHAR(100),
     animal VARCHAR(100),
     item VARCHAR(100),
+    usuario VARCHAR(50),
     fecha DATETIME DEFAULT CURRENT_TIMESTAMP
 )");
 
@@ -70,7 +72,7 @@ function getGastos($db) {
     return $row['total'] ?? 0;
 }
 
-function processMessageOffline($msg, $db) {
+function processMessageOffline($msg, $db, $user) {
     $msgLower = strtolower($msg);
     
     if (strpos($msgLower, 'ayuda') !== false) {
@@ -86,7 +88,7 @@ function processMessageOffline($msg, $db) {
         $cult = preg_match('/(maiz|trigo|soja|avena|sorgo|girasol)/i', $msg, $m) ? $m[1] : 'cultivo';
         $lugar = preg_match('/(lote|norte|sur|este|oeste|potrero|campo)\s*\w*/i', $msg, $m) ? $m[0] : 'lote';
         
-        $db->query("INSERT INTO registros (tipo, cantidad, unidad, lugar, cultivo) VALUES ('siembra', $cant, 'ha', '$lugar', '$cult')");
+        $db->query("INSERT INTO registros (tipo, cantidad, unidad, lugar, cultivo, usuario) VALUES ('siembra', $cant, 'ha', '$lugar', '$cult', '$user')");
         
         return "✅ <strong>SIEMBRA REGISTRADA</strong><div class='data-preview'>Cultivo: $cult<br>Cantidad: $cant ha<br>Lugar: $lugar</div>";
     }
@@ -96,7 +98,7 @@ function processMessageOffline($msg, $db) {
         $tipo = preg_match('/(terneros|vacas|caballos|ovejas|cabritos|cerdos)/i', $msg, $m) ? $m[1] : 'animales';
         $lugar = preg_match('/(potrero|lote|campo)\s*\w*/i', $msg, $m) ? $m[0] : 'potrero';
         
-        $db->query("INSERT INTO registros (tipo, cantidad, lugar, animal) VALUES ('nacimiento', $cant, '$lugar', '$tipo')");
+        $db->query("INSERT INTO registros (tipo, cantidad, lugar, animal, usuario) VALUES ('nacimiento', $cant, '$lugar', '$tipo', '$user')");
         
         return "✅ <strong>NACIMIENTO REGISTRADO</strong><div class='data-preview'>Cantidad: $cant $tipo<br>Lugar: $lugar</div>";
     }
@@ -106,18 +108,18 @@ function processMessageOffline($msg, $db) {
         
         if (preg_match('/(\d+)\s*(litros?|lts?|lt)/i', $msg, $litros)) {
             $cant = $litros[1];
-            $db->query("INSERT INTO registros (tipo, cantidad, unidad, item) VALUES ('compra', $cant, 'litros', '$item')");
+            $db->query("INSERT INTO registros (tipo, cantidad, unidad, item, usuario) VALUES ('compra', $cant, 'litros', '$item', '$user')");
             return "✅ <strong>COMPRA REGISTRADA</strong><div class='data-preview'>Item: $item<br>Cantidad: $cant litros</div>";
         } else {
             $precio = preg_match('/\$?([\d,.]+)/', $msg, $m) ? str_replace(',', '', $m[1]) : 0;
-            $db->query("INSERT INTO registros (tipo, monto, item) VALUES ('compra', $precio, '$item')");
+            $db->query("INSERT INTO registros (tipo, monto, item, usuario) VALUES ('compra', $precio, '$item', '$user')");
             return "✅ <strong>COMPRA REGISTRADA</strong><div class='data-preview'>Item: $item<br>Monto: \$" . number_format($precio) . "</div>";
         }
     }
     
     if (strpos($msgLower, 'kms') !== false || strpos($msgLower, 'kilometros') !== false || (strpos($msgLower, 'km') !== false && strlen($msgLower) < 20)) {
         $cant = preg_match('/(\d+)/', $msg, $m) ? $m[1] : 0;
-        $db->query("INSERT INTO registros (tipo, cantidad, unidad, descripcion) VALUES ('trabajo', $cant, 'kms', 'maquinaria')");
+        $db->query("INSERT INTO registros (tipo, cantidad, unidad, descripcion, usuario) VALUES ('trabajo', $cant, 'kms', 'maquinaria', '$user')");
         return "✅ <strong>TRABAJO REGISTRADO</strong><div class='data-preview'>Kilometros: $cant kms</div>";
     }
     
@@ -150,7 +152,7 @@ function processMessageOffline($msg, $db) {
 }
 
 // Primero intentar con modo offline
-$msg = processMessageOffline($message, $db);
+$msg = processMessageOffline($message, $db, $user);
 
 if ($msg === null && $groqKey && strlen($groqKey) > 10) {
     $historial = getHistorial($db);
@@ -199,13 +201,13 @@ Respondé SOLO con JSON.";
             $datos = $result['datos'] ?? [];
             
             if ($tipo === 'siembra') {
-                $db->query("INSERT INTO registros (tipo, cantidad, unidad, lugar, cultivo) VALUES ('siembra', " . ($datos['cantidad'] ?? 0) . ", 'ha', '" . ($datos['lugar'] ?? 'lote') . "', '" . ($datos['cultivo'] ?? 'cultivo') . "')");
+                $db->query("INSERT INTO registros (tipo, cantidad, unidad, lugar, cultivo, usuario) VALUES ('siembra', " . ($datos['cantidad'] ?? 0) . ", 'ha', '" . ($datos['lugar'] ?? 'lote') . "', '" . ($datos['cultivo'] ?? 'cultivo') . "', '$user')");
                 $msg = "✅ <strong>SIEMBRA REGISTRADA</strong><div class='data-preview'>Cultivo: " . ($datos['cultivo'] ?? 'cultivo') . "<br>Cantidad: " . ($datos['cantidad'] ?? 0) . "</div>";
             } elseif ($tipo === 'nacimiento') {
-                $db->query("INSERT INTO registros (tipo, cantidad, lugar, animal) VALUES ('nacimiento', " . ($datos['cantidad'] ?? 0) . ", '" . ($datos['lugar'] ?? 'potrero') . "', '" . ($datos['animal'] ?? 'animales') . "')");
+                $db->query("INSERT INTO registros (tipo, cantidad, lugar, animal, usuario) VALUES ('nacimiento', " . ($datos['cantidad'] ?? 0) . ", '" . ($datos['lugar'] ?? 'potrero') . "', '" . ($datos['animal'] ?? 'animales') . "', '$user')");
                 $msg = "✅ <strong>NACIMIENTO REGISTRADO</strong><div class='data-preview'>Cantidad: " . ($datos['cantidad'] ?? 0) . "</div>";
             } elseif ($tipo === 'compra') {
-                $db->query("INSERT INTO registros (tipo, monto, item) VALUES ('compra', " . ($datos['monto'] ?? 0) . ", '" . ($datos['item'] ?? 'insumo') . "')");
+                $db->query("INSERT INTO registros (tipo, monto, item, usuario) VALUES ('compra', " . ($datos['monto'] ?? 0) . ", '" . ($datos['item'] ?? 'insumo') . "', '$user')");
                 $msg = "✅ <strong>COMPRA REGISTRADA</strong><div class='data-preview'>Item: " . ($datos['item'] ?? 'insumo') . "<br>Monto: \$" . number_format($datos['monto'] ?? 0) . "</div>";
             }
         } elseif ($result && isset($result['accion']) && $result['accion'] === 'consultar') {
