@@ -143,12 +143,13 @@ function processMessageOffline($msg, $db) {
         while ($row = $result->fetch_assoc()) {
             $registros[] = $row['tipo'] . ' - ' . ($row['cultivo'] ?? $row['animal'] ?? $row['item'] ?? '') . ' (' . $row['fecha'] . ')';
         }
-        return empty($registros) ? 'No hay registros aún.' : '📋 <strong>ULTIMOS REGISTROS</strong><div class='data-preview">' . implode('<br>', $registros) . '</div>';
+        return empty($registros) ? 'No hay registros aún.' : '📋 <strong>ULTIMOS REGISTROS</strong><div class="data-preview">' . implode('<br>', $registros) . '</div>';
     }
     
     return null;
 }
 
+// Primero intentar con modo offline
 $msg = processMessageOffline($message, $db);
 
 if ($msg === null && $groqKey && strlen($groqKey) > 10) {
