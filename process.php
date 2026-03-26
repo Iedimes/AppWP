@@ -2,32 +2,43 @@
 
 header('Content-Type: application/json');
 
-$apiKey = '';
-$groqKey = '';
+$config = include 'config.php';
+$apiKey = $config['openai_api_key'] ?? '';
+$groqKey = $config['groq_api_key'] ?? '';
+
+// Configuración MariaDB/MySQL desde config.php
+$dbhost = $config['db_host'] ?? 'localhost';
+$dbuser = $config['db_user'] ?? 'root';
+$dbpass = $config['db_pass'] ?? '';
+$dbname = $config['db_name'] ?? 'field_data';
 
 $input = json_decode(file_get_contents('php://input'), true);
 $message = trim($input['message'] ?? '');
 
-$db = new SQLite3('field_data.db');
+$db = new mysqli($dbhost, $dbuser, $dbpass, $dbname);
 
-$db->exec("CREATE TABLE IF NOT EXISTS registros (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    tipo TEXT NOT NULL,
+if ($db->connect_error) {
+    die(json_encode(['response' => 'Error de conexión a la base de datos']));
+}
+
+$db->query("CREATE TABLE IF NOT EXISTS registros (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    tipo VARCHAR(50) NOT NULL,
     descripcion TEXT,
     cantidad REAL,
-    unidad TEXT,
-    lugar TEXT,
+    unidad VARCHAR(20),
+    lugar VARCHAR(100),
     monto REAL,
-    cultivo TEXT,
-    animal TEXT,
-    item TEXT,
+    cultivo VARCHAR(100),
+    animal VARCHAR(100),
+    item VARCHAR(100),
     fecha DATETIME DEFAULT CURRENT_TIMESTAMP
 )");
 
 function getHistorial($db, $limit = 10) {
     $result = $db->query("SELECT * FROM registros ORDER BY fecha DESC LIMIT $limit");
     $registros = [];
-    while ($row = $result->fetchArray()) {
+    while ($row = $result->fetch_assoc()) {
         $registros[] = [
             'tipo' => $row['tipo'],
             'cultivo' => $row['cultivo'],
@@ -45,7 +56,7 @@ function getHistorial($db, $limit = 10) {
 function getStock($db) {
     $result = $db->query("SELECT item, SUM(cantidad) as total FROM registros WHERE tipo = 'compra' AND item IS NOT NULL GROUP BY item");
     $stock = [];
-    while ($row = $result->fetchArray()) {
+    while ($row = $result->fetch_assoc()) {
         if ($row['total'] > 0) {
             $stock[] = $row['item'] . ': ' . $row['total'];
         }
@@ -55,7 +66,7 @@ function getStock($db) {
 
 function getGastos($db) {
     $result = $db->query("SELECT SUM(monto) as total FROM registros WHERE tipo = 'compra'");
-    $row = $result->fetchArray();
+    $row = $result->fetch_assoc();
     return $row['total'] ?? 0;
 }
 
@@ -75,7 +86,7 @@ function processMessageOffline($msg, $db) {
         $cult = preg_match('/(maiz|trigo|soja|avena|sorgo|girasol)/i', $msg, $m) ? $m[1] : 'cultivo';
         $lugar = preg_match('/(lote|norte|sur|este|oeste|potrero|campo)\s*\w*/i', $msg, $m) ? $m[0] : 'lote';
         
-        $db->exec("INSERT INTO registros (tipo, cantidad, unidad, lugar, cultivo) VALUES ('siembra', $cant, 'ha', '$lugar', '$cult')");
+        $db->query("INSERT INTO registros (tipo, cantidad, unidad, lugar, cultivo) VALUES ('siembra', $cant, 'ha', '$lugar', '$cult')");
         
         return "✅ <strong>SIEMBRA REGISTRADA</strong><div class='data-preview'>Cultivo: $cult<br>Cantidad: $cant ha<br>Lugar: $lugar</div>";
     }
@@ -85,7 +96,7 @@ function processMessageOffline($msg, $db) {
         $tipo = preg_match('/(terneros|vacas|caballos|ovejas|cabritos|cerdos)/i', $msg, $m) ? $m[1] : 'animales';
         $lugar = preg_match('/(potrero|lote|campo)\s*\w*/i', $msg, $m) ? $m[0] : 'potrero';
         
-        $db->exec("INSERT INTO registros (tipo, cantidad, lugar, animal) VALUES ('nacimiento', $cant, '$lugar', '$tipo')");
+        $db->query("INSERT INTO registros (tipo, cantidad, lugar, animal) VALUES ('nacimiento', $cant, '$lugar', '$tipo')");
         
         return "✅ <strong>NACIMIENTO REGISTRADO</strong><div class='data-preview'>Cantidad: $cant $tipo<br>Lugar: $lugar</div>";
     }
@@ -95,25 +106,25 @@ function processMessageOffline($msg, $db) {
         
         if (preg_match('/(\d+)\s*(litros?|lts?|lt)/i', $msg, $litros)) {
             $cant = $litros[1];
-            $db->exec("INSERT INTO registros (tipo, cantidad, unidad, item) VALUES ('compra', $cant, 'litros', '$item')");
+            $db->query("INSERT INTO registros (tipo, cantidad, unidad, item) VALUES ('compra', $cant, 'litros', '$item')");
             return "✅ <strong>COMPRA REGISTRADA</strong><div class='data-preview'>Item: $item<br>Cantidad: $cant litros</div>";
         } else {
             $precio = preg_match('/\$?([\d,.]+)/', $msg, $m) ? str_replace(',', '', $m[1]) : 0;
-            $db->exec("INSERT INTO registros (tipo, monto, item) VALUES ('compra', $precio, '$item')");
+            $db->query("INSERT INTO registros (tipo, monto, item) VALUES ('compra', $precio, '$item')");
             return "✅ <strong>COMPRA REGISTRADA</strong><div class='data-preview'>Item: $item<br>Monto: \$" . number_format($precio) . "</div>";
         }
     }
     
     if (strpos($msgLower, 'kms') !== false || strpos($msgLower, 'kilometros') !== false || (strpos($msgLower, 'km') !== false && strlen($msgLower) < 20)) {
         $cant = preg_match('/(\d+)/', $msg, $m) ? $m[1] : 0;
-        $db->exec("INSERT INTO registros (tipo, cantidad, unidad, descripcion) VALUES ('trabajo', $cant, 'kms', 'maquinaria')");
+        $db->query("INSERT INTO registros (tipo, cantidad, unidad, descripcion) VALUES ('trabajo', $cant, 'kms', 'maquinaria')");
         return "✅ <strong>TRABAJO REGISTRADO</strong><div class='data-preview'>Kilometros: $cant kms</div>";
     }
     
     if (strpos($msgLower, 'stock') !== false || strpos($msgLower, 'inventario') !== false) {
         $result = $db->query("SELECT item, SUM(cantidad) as total FROM registros WHERE tipo = 'compra' AND item IS NOT NULL GROUP BY item");
         $stock = [];
-        while ($row = $result->fetchArray()) {
+        while ($row = $result->fetch_assoc()) {
             if ($row['total'] > 0) $stock[] = $row['item'] . ': ' . $row['total'];
         }
         return empty($stock) ? '📦 <strong>STOCK</strong><div class="data-preview">No hay registros</div>' : '📦 <strong>STOCK ACTUAL</strong><div class="data-preview">' . implode('<br>', $stock) . '</div>';
@@ -121,7 +132,7 @@ function processMessageOffline($msg, $db) {
     
     if (strpos($msgLower, 'gaste') !== false || strpos($msgLower, 'gastos') !== false || strpos($msgLower, 'gastamos') !== false) {
         $result = $db->query("SELECT SUM(monto) as total FROM registros WHERE tipo = 'compra'");
-        $row = $result->fetchArray();
+        $row = $result->fetch_assoc();
         $total = $row['total'] ?? 0;
         return '💰 <strong>GASTOS</strong><div class="data-preview">Total: \$' . number_format($total) . '</div>';
     }
@@ -129,19 +140,17 @@ function processMessageOffline($msg, $db) {
     if (strpos($msgLower, 'mostrar') !== false && strpos($msgLower, 'registro') !== false) {
         $result = $db->query("SELECT * FROM registros ORDER BY fecha DESC LIMIT 10");
         $registros = [];
-        while ($row = $result->fetchArray()) {
+        while ($row = $result->fetch_assoc()) {
             $registros[] = $row['tipo'] . ' - ' . ($row['cultivo'] ?? $row['animal'] ?? $row['item'] ?? '') . ' (' . $row['fecha'] . ')';
         }
-        return empty($registros) ? 'No hay registros aún.' : '📋 <strong>ULTIMOS REGISTROS</strong><div class="data-preview">' . implode('<br>', $registros) . '</div>';
+        return empty($registros) ? 'No hay registros aún.' : '📋 <strong>ULTIMOS REGISTROS</strong><div class='data-preview">' . implode('<br>', $registros) . '</div>';
     }
     
     return null;
 }
 
-// Primero intentar con modo offline
 $msg = processMessageOffline($message, $db);
 
-// Si no funciona, usar Groq
 if ($msg === null && $groqKey && strlen($groqKey) > 10) {
     $historial = getHistorial($db);
     $stock = getStock($db);
@@ -189,13 +198,13 @@ Respondé SOLO con JSON.";
             $datos = $result['datos'] ?? [];
             
             if ($tipo === 'siembra') {
-                $db->exec("INSERT INTO registros (tipo, cantidad, unidad, lugar, cultivo) VALUES ('siembra', " . ($datos['cantidad'] ?? 0) . ", 'ha', '" . ($datos['lugar'] ?? 'lote') . "', '" . ($datos['cultivo'] ?? 'cultivo') . "')");
+                $db->query("INSERT INTO registros (tipo, cantidad, unidad, lugar, cultivo) VALUES ('siembra', " . ($datos['cantidad'] ?? 0) . ", 'ha', '" . ($datos['lugar'] ?? 'lote') . "', '" . ($datos['cultivo'] ?? 'cultivo') . "')");
                 $msg = "✅ <strong>SIEMBRA REGISTRADA</strong><div class='data-preview'>Cultivo: " . ($datos['cultivo'] ?? 'cultivo') . "<br>Cantidad: " . ($datos['cantidad'] ?? 0) . "</div>";
             } elseif ($tipo === 'nacimiento') {
-                $db->exec("INSERT INTO registros (tipo, cantidad, lugar, animal) VALUES ('nacimiento', " . ($datos['cantidad'] ?? 0) . ", '" . ($datos['lugar'] ?? 'potrero') . "', '" . ($datos['animal'] ?? 'animales') . "')");
+                $db->query("INSERT INTO registros (tipo, cantidad, lugar, animal) VALUES ('nacimiento', " . ($datos['cantidad'] ?? 0) . ", '" . ($datos['lugar'] ?? 'potrero') . "', '" . ($datos['animal'] ?? 'animales') . "')");
                 $msg = "✅ <strong>NACIMIENTO REGISTRADO</strong><div class='data-preview'>Cantidad: " . ($datos['cantidad'] ?? 0) . "</div>";
             } elseif ($tipo === 'compra') {
-                $db->exec("INSERT INTO registros (tipo, monto, item) VALUES ('compra', " . ($datos['monto'] ?? 0) . ", '" . ($datos['item'] ?? 'insumo') . "')");
+                $db->query("INSERT INTO registros (tipo, monto, item) VALUES ('compra', " . ($datos['monto'] ?? 0) . ", '" . ($datos['item'] ?? 'insumo') . "')");
                 $msg = "✅ <strong>COMPRA REGISTRADA</strong><div class='data-preview'>Item: " . ($datos['item'] ?? 'insumo') . "<br>Monto: \$" . number_format($datos['monto'] ?? 0) . "</div>";
             }
         } elseif ($result && isset($result['accion']) && $result['accion'] === 'consultar') {
@@ -214,4 +223,5 @@ if ($msg === null) {
     $msg = 'No entendí tu mensaje. Escribí <strong>ayuda</strong> para ver qué podés registrar.';
 }
 
+$db->close();
 echo json_encode(['response' => $msg]);
