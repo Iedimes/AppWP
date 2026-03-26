@@ -65,18 +65,72 @@
 
     <script>
         let userPhone = localStorage.getItem('fd_phone') || '';
+        let userName = localStorage.getItem('fd_nombre') || '';
         let isRecording = false;
         let recognition = null;
 
-        if (userPhone) showChat();
+        if (userPhone) {
+            userName = userName || userPhone;
+            showChat();
+            initMic();
+        }
 
         function login() {
             const p = document.getElementById('loginPhone').value.trim();
             if (!p) return alert('Ingresá tu número');
-            userPhone = p;
-            localStorage.setItem('fd_phone', p);
-            showChat();
-            initMic();
+            
+            document.getElementById('loginPhone').disabled = true;
+            document.querySelector('.login-box button').textContent = 'Verificando...';
+            
+            fetch('process.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'login', telefono: p})
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    // Usuario existe
+                    userPhone = p;
+                    userName = d.nombre || p;
+                    localStorage.setItem('fd_phone', p);
+                    localStorage.setItem('fd_nombre', userName);
+                    showChat();
+                    initMic();
+                } else {
+                    // Usuario nuevo - pedir nombre
+                    const nombre = prompt('Usuario nuevo. Ingresá tu nombre:');
+                    if (!nombre) {
+                        document.getElementById('loginPhone').disabled = false;
+                        document.querySelector('.login-box button').textContent = 'Entrar';
+                        return;
+                    }
+                    
+                    // Registrar nuevo usuario
+                    fetch('process.php', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({action: 'registrar', telefono: p, nombre: nombre})
+                    })
+                    .then(r => r.json())
+                    .then(r => {
+                        userPhone = p;
+                        userName = nombre;
+                        localStorage.setItem('fd_phone', p);
+                        localStorage.setItem('fd_nombre', nombre);
+                        showChat();
+                        initMic();
+                    });
+                }
+            })
+            .catch(() => {
+                // Sin servidor, permitir acceso
+                userPhone = p;
+                userName = p;
+                localStorage.setItem('fd_phone', p);
+                showChat();
+                initMic();
+            });
         }
 
         function logout() { localStorage.removeItem('fd_phone'); location.reload(); }
@@ -84,7 +138,7 @@
         function showChat() {
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('chatContainer').style.display = 'flex';
-            document.getElementById('userDisplay').textContent = userPhone;
+            document.getElementById('userDisplay').textContent = userName || userPhone;
         }
 
         async function initMic() {

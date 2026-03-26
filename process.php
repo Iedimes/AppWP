@@ -22,6 +22,22 @@ if ($db->connect_error) {
     die(json_encode(['response' => 'Error de conexión a la base de datos']));
 }
 
+// Tabla de usuarios
+$db->query("CREATE TABLE IF NOT EXISTS usuarios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    telefono VARCHAR(20) UNIQUE,
+    nombre VARCHAR(100),
+    rol VARCHAR(20) DEFAULT 'user',
+    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP
+)");
+
+// Insertar usuarios ficticios si no existen
+$db->query("INSERT IGNORE INTO usuarios (telefono, nombre, rol) VALUES 
+    ('0981517309', 'Juan Chavez', 'admin'),
+    ('0972123456', 'Maria Lopez', 'user'),
+    ('0983765432', 'Pedro Gomez', 'user')
+");
+
 $db->query("CREATE TABLE IF NOT EXISTS registros (
     id INT AUTO_INCREMENT PRIMARY KEY,
     tipo VARCHAR(50) NOT NULL,
@@ -36,6 +52,31 @@ $db->query("CREATE TABLE IF NOT EXISTS registros (
     usuario VARCHAR(50),
     fecha DATETIME DEFAULT CURRENT_TIMESTAMP
 )");
+
+// Verificar login de usuario
+$action = $input['action'] ?? '';
+if ($action === 'login') {
+    $telefono = trim($input['telefono'] ?? '');
+    $result = $db->query("SELECT nombre, rol FROM usuarios WHERE telefono = '$telefono'");
+    $row = $result->fetch_assoc();
+    echo json_encode([
+        'success' => !!$row,
+        'nombre' => $row['nombre'] ?? null,
+        'rol' => $row['rol'] ?? 'user'
+    ]);
+    $db->close();
+    exit;
+}
+
+// Registrar nuevo usuario
+if ($action === 'registrar') {
+    $telefono = trim($input['telefono'] ?? '');
+    $nombre = trim($input['nombre'] ?? '');
+    $db->query("INSERT INTO usuarios (telefono, nombre, rol) VALUES ('$telefono', '$nombre', 'user')");
+    echo json_encode(['success' => true]);
+    $db->close();
+    exit;
+}
 
 function getHistorial($db, $limit = 10) {
     $result = $db->query("SELECT * FROM registros ORDER BY fecha DESC LIMIT $limit");
